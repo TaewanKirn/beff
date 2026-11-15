@@ -1,0 +1,35 @@
+# macOS
+.DS_Store
+._*
+
+# IDE
+.idea/
+*.iml
+*.swp
+
+# Claude Code — 개인 로컬 설정만 제외 (agents/·skills/는 팀 공유 하네스이므로 커밋)
+.claude/settings.local.json
+
+# Android / Gradle 빌드 산출물
+# (app/pleos-sample-project-.../.gitignore 가 해당 서브트리를 이미 덮지만 루트에도 명시)
+.gradle/
+build/
+local.properties
+*.apk
+*.aab
+*.ap_
+*.dex
+*.jks
+*.keystore
+keystore.properties
+
+# 로그·임시
+*.log
+captures/
+
+# 공공데이터 원본 수집물(용량 큼·재수집 가능)
+data/public-raw/
+
+# 파이썬 캐시
+__pycache__/
+*.pyc

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- assets/beff/app_icon/smile_foreground.svg (144 기준, ㅇㅡㅇ 웃음) -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="144"
+    android:viewportHeight="144">
+    <path
+        android:pathData="M35.5,60a11.5,11.5 0,1 0,23 0a11.5,11.5 0,1 0,-23 0"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="9" />
+    <path
+        android:pathData="M85.5,60a11.5,11.5 0,1 0,23 0a11.5,11.5 0,1 0,-23 0"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="9" />
+    <path
+        android:pathData="M50,90C64.6667,100.667 79.3333,100.667 94,90"
+        android:strokeColor="#FFFFFF"
+        android:strokeLineJoin="round"
+        android:strokeWidth="9" />
+</vector>

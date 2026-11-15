@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="data:," />
+    <title>베프 플로우 점검</title>
+    <style>
+      :root {
+        --teal: #00837f;
+        --teal-soft: #e0f2f1;
+        --warn: #d32f2f;
+        --text: #1d2327;
+        --sub: #4a545c;
+        --line: #dfe5e8;
+        --bg: #f4f7f8;
+        --ok: #2f9e5b;
+        --off: #b4b4b4;
+        --font: 'Pretendard', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.4 var(--font); }
+      .top {
+        position: sticky; top: 0; z-index: 10; display: flex; gap: 16px; align-items: center;
+        padding: 12px 20px; background: #fff; border-bottom: 1px solid var(--line);
+      }
+      .brand { font-weight: 700; font-size: 18px; color: var(--teal); white-space: nowrap; }
+      .brand span { color: var(--text); }
+      .status { display: flex; gap: 8px; align-items: center; min-width: 0; color: var(--sub); font-size: 13px; }
+      #line { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .dot { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--off); }
+      .dot.on { background: var(--ok); }
+      .dot.half { background: #f2a33a; }
+      main { display: grid; gap: 12px; padding: 16px 20px 40px; }
+      .bar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; }
+      .bar h1 { margin: 0; font-size: 17px; }
+      .hint { margin: 4px 0 0; color: var(--sub); font-size: 12.5px; line-height: 1.5; }
+      #flow { max-height: calc(100vh - 150px); }
+      .card { padding: 14px 16px; background: #fff; border: 1px solid var(--line); border-radius: 14px; }
+      .card h2 { margin: 0 0 6px; font-size: 15px; }
+      .card h3 { margin: 12px 0 8px; font-size: 13px; color: var(--sub); }
+      .buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+      .btn {
+        display: inline-flex; gap: 6px; align-items: center; padding: 7px 12px;
+        border: 1px solid var(--line); border-radius: 999px; background: #fff; color: var(--text);
+        font: inherit; cursor: pointer;
+      }
+      .btn:hover { border-color: var(--teal); }
+      .btn.on { background: var(--text); border-color: var(--text); color: #fff; }
+      .btn.sent { background: var(--teal-soft); }
+      .btn.failed { background: #fdecea; border-color: var(--warn); }
+      .btn.warn { color: var(--warn); }
+      form { display: flex; gap: 8px; }
+      input { flex: 1; min-width: 0; padding: 7px 12px; border: 1px solid var(--line); border-radius: 999px; font: inherit; }
+      .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; }
+      #toast {
+        position: fixed; left: 50%; bottom: 24px; z-index: 20; transform: translateX(-50%); max-width: 90vw;
+        padding: 10px 16px; border-radius: 12px; background: var(--text); color: #fff; font-size: 13px;
+        opacity: 0; transition: opacity .2s; pointer-events: none;
+      }
+      #toast.show { opacity: 1; }
+      pre { overflow: auto; max-height: 240px; font-size: 12px; }
+      .controls > .card:first-child { grid-column: 1 / -1; } /* 플로우 카드는 한 줄 전체 */
+      .now { margin: 8px 0 4px; padding: 8px 12px; border-radius: 10px; background: var(--bg); font-size: 13px; color: var(--sub); }
+      .now b { color: var(--text); }
+      .scenes { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
+      .scene { padding: 10px 12px 12px; border: 1px solid var(--line); border-radius: 12px; }
+      .scene h3 { margin: 0 0 2px; font-size: 13px; color: var(--text); }
+      .scene .tag { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+      .tag.p { background: var(--teal-soft); color: var(--teal); }
+      .tag.d { background: #fdecea; color: var(--warn); }
+      .tag.x { background: #eef0f2; color: var(--sub); }
+      .scene .buttons { flex-direction: column; align-items: stretch; margin-top: 8px; }
+      .scene .btn { justify-content: space-between; border-radius: 10px; text-align: left; }
+      .scene .btn small { color: var(--sub); font-size: 11px; white-space: nowrap; }
+      .btn.on small { color: #dfe5e8; }
+      summary { cursor: pointer; font-weight: 700; }
+    </style>
+  </head>
+  <body>
+    <header class="top">
+      <div class="brand">베프 <span>플로우 점검</span></div>
+      <div class="status"><span class="dot" id="dot"></span><span id="line">연결 확인 중</span></div>
+    </header>
+    <main>
+      <div class="bar">
+        <div>
+          <h1>전체 화면 플로우 (Figma · 1112 검증 › 8)</h1>
+          <p class="hint">
+            상자를 누르면 에뮬레이터의 베프가 그 화면으로 바뀝니다. 숫자가 붙은 상자는 상태를 골라 엽니다. 흐린 상자는 바로 열 수 없는 화면이라 직전 화면으로 보내고 무엇을 누르면 되는지 알려 줍니다.
+            색 칩(→ B-1 홈 등)을 누르면 그 상자로 갑니다. 지금 화면은 굵은 틸 테두리로 표시합니다.
+          </p>
+        </div>
+        <div class="buttons" id="zoom"></div>
+      </div>
+      <div id="flow"></div>
+
+      <div class="controls">
+        <div class="card">
+          <h2>플로우별 차량 상태</h2>
+          <p class="hint">버튼 하나가 「여정 상태 → 기어(→ 문 열림)」를 차례로 보냅니다. 기어는 앱 안에서만 덮어씁니다(차량에는 아무것도 보내지 않음). Virtual Console 값보다 우선하니 끝나면 「실제 기어 따르기」로 풀어 주세요.</p>
+          <div class="now" id="now">지금: -</div>
+          <div id="controls"></div>
+        </div>
+        <div class="card">
+          <h2>검색어로 열기 (C-3)</h2>
+          <form id="search">
+            <input id="query" placeholder="검색어 (예: 서울숲, 수유실)" />
+            <button class="btn" type="submit">검색 탭에서 열기</button>
+          </form>
+          <details style="margin-top: 14px">
+            <summary>앱 상태 원본</summary>
+            <pre id="raw">-</pre>
+          </details>
+        </div>
+      </div>
+    </main>
+    <div id="toast" role="status"></div>
+
+    <script type="module">
+      import { createFlowView, FLOW_CSS } from './flow-view.js'
+
+      // Figma 상자 이름 → 화면 바로 가기(AppViewModel.debugJump 대상).
+      // route: 앱이 로그로 알리는 Route.toString()의 앞부분, popup: 떠 있는 팝업, locked: 주행 잠금 화면
+      const T = 'tour-128611'
+      const v = (label, target, route, extra = {}) => ({ label, target, route, ...extra })
+      const BOXES = {
+        'A-1 스플래시': { variants: [v('스플래시', 'splash', 'Splash')] },
+        'A-1b 위치정보 · 개인정보 동의': { variants: [v('동의 화면', 'consent', 'Consent(review=false')] },
+        '분기 저장된 여정이 있나?': { hint: '저장된 여정이 있으면 F 여정 탭, 없으면 A-2 프로필 선택으로 갑니다.', variants: [
+          v('있음 → 여정 탭', 'journey', 'Main(tab=Journey)'), v('없음 → 프로필 선택', 'profile', 'ProfileSelect')] },
+        'A-2 오늘 누구와 함께 가나요?': { variants: [
+          v('프로필 0개', 'profile0', 'ProfileSelect'), v('프로필 2개', 'profile', 'ProfileSelect'), v('프로필 4개 (꽉 참)', 'profile4', 'ProfileSelect')] },
+        'A-3 이동 보조수단 · 인원': { variants: [
+          v('프로필 만들기', 'mobility', 'MobilityStep(flow=Create'), v('일회용 (프로필 없이 출발)', 'mobility_one', 'MobilityStep(flow=OneTime')] },
+        'A-5 먼저 찾을 시설': { variants: [
+          v('프로필 만들기', 'filter', 'FilterStep(flow=Create'), v('일회용', 'filter_one', 'FilterStep(flow=OneTime', { popup: null })] },
+        'A-6 이미지 · 이름 저장': { variants: [v('이미지 · 이름', 'people', 'PeopleStep')] },
+        '팝업 일회용 이동 → 프로필로 등록?': { variants: [
+          v('등록할까요?', 'register', 'FilterStep(flow=OneTime', { popup: 'register' }),
+          v('등록 완료', 'registered', 'FilterStep(flow=OneTime', { popup: 'registered' })] },
+        'A-7 프로필이 가득 찼을 때': { variants: [v('교체할 프로필 고르기', 'replace', 'ReplaceProfile', { popup: null })] },
+        '팝업 프로필 지우기 확인': { variants: [v('삭제 팝업', 'delete', 'ReplaceProfile', { popup: 'delete' })] },
+        'GNB 홈 · 여정 · 설정 (탭 첫 화면)': { variants: [
+          v('홈', 'home', 'Main(tab=Home)'), v('검색', 'search', 'Main(tab=Search)'), v('여정', 'journey', 'Main(tab=Journey)'), v('설정', 'settings', 'Main(tab=Settings)')] },
+        'B-5 체크인 토스트': { variants: [v('체크인 토스트', 'home_checkin', 'Main(tab=Home)', { popup: 'checkin' })] },
+        'B-1~B-4 홈 (+ 여정 중 · 휴식 · 도착 배너)': { variants: [
+          v('홈 · 유모차 프로필', 'home', 'Main(tab=Home)'), v('홈 · 휠체어 프로필', 'home_w', 'Main(tab=Home)'),
+          v('여정 중 홈', 'home_trip', 'Main(tab=Home)'), v('여정 중 홈 · 휠체어', 'home_trip_w', 'Main(tab=Home)'),
+          v('도착 (에뮬레이터 위치 근처 목적지)', 'arrive', 'Main(tab=Home)')] },
+        'C-1 검색 (최근 검색)': { variants: [
+          v('검색', 'search', 'Main(tab=Search)'), v('최근 검색 펼침', 'search_recent', 'Main(tab=Search)'), v('최근 검색 편집', 'search_edit', 'Main(tab=Search)')] },
+        'C-3 검색 결과 / 시설 타일 결과': { variants: [
+          v('「서울숲」 검색 결과', 'search', 'Main(tab=Search)', { query: '서울숲' }),
+          v('「수유실」 시설 결과', 'search', 'Main(tab=Search)', { query: '수유실' })] },
+        'C-6 장소 상세': { variants: [v('서울숲 상세', 'place', `Briefing(placeId=${T}`)] },
+        'C-5 정보 없음 → 근처 대안': { variants: [v('정보 없는 장소 상세', 'place_noinfo', 'Briefing')] },
+        'D-1 출발 브리핑 (D-4: 쉼터 없음 상태)': { variants: [v('출발 브리핑', 'briefing', 'Briefing')] },
+        'D-2 쉬어갈 곳 자세히 보기': { hint: 'D-1 출발 브리핑에서 쉬어갈 곳 줄을 누르면 열립니다.', go: { target: 'briefing', route: 'Briefing' } },
+        'D-3 경유지 추가 후': { variants: [v('경유지 1곳 넣은 브리핑', 'briefing_stop', 'Briefing')] },
+        'D-5 하차 브리핑 미리보기': { variants: [v('하차 브리핑 미리 보기', 'unload_preview', `Unload(placeId=${T}, preview=true`)] },
+        'D-6 내릴 곳이 없을 때 (입구 제보)': { variants: [
+          v('입구 제보 (자동)', 'alt', `Alternatives(placeId=${T}, manual=false, byUser=false`),
+          v('주차가 어려워요 (G-2에서)', 'alt_user', `Alternatives(placeId=${T}, manual=false, byUser=true`)] },
+        'D-7 안내 시작 팝업 (5초 자동)': { hint: 'D-1 출발 브리핑에서 「안내 시작」을 누르면 열립니다.', go: { target: 'briefing', route: 'Briefing' } },
+        '내비 기본 내비 경로 안내': { hint: '기본 내비 화면입니다. D-7에서 안내가 시작되면 넘어갑니다.' },
+        'E-1~E-5 주행 중 가림 + 음성 토스트': { variants: [
+          v('주행 잠금 (기어 D로 덮어쓰기)', 'gear_d', null, { locked: true }),
+          v('주행 데모 여정 (경유지 1곳)', 'drive', 'Main(tab=Journey)')] },
+        'G-1 경유지 도착 (기어 P)': { variants: [v('경유지 도착 · 하차 동선', 'stop_arrive', 'Unload')] },
+        'G-2 목적지 도착 · 하차 동선': { variants: [
+          v('하차 브리핑', 'unload', `Unload(placeId=${T}, preview=false`), v('하차 약도', 'map', 'UnloadMap'),
+          v('지하 주차장 하차', 'unload_under', 'Unload'), v('주차 → 대체 분기 (오늘 입구 제보 있음)', 'arrive_report', 'Alternatives')] },
+        'G-4 문 열림 안내': { hint: '문 열림 신호를 앱 안에서만 흉내 냅니다. G-2 하차 화면에서 누르세요.', variants: [
+          v('G-2 하차 브리핑 열기', 'unload', `Unload(placeId=${T}, preview=false`), v('문 열림 신호 (G-4)', 'door', undefined)] },
+        'G-5 근처 주차장': { variants: [v('근처 주차장', 'alt_manual', `Alternatives(placeId=${T}, manual=true`)] },
+        'F-1 · F-2 여정 중 (경유지 있음)': { variants: [
+          v('F-1 경유지 없음', 'journey', 'Main(tab=Journey)'), v('F-2 경유지 있음', 'journey_stop', 'Main(tab=Journey)'),
+          v('F-2 + 도착 전 경고 (05-2d)', 'journey_warn', 'Main(tab=Journey)')] },
+        'F-3 쉬어가기 추천 캐러셀': { hint: 'F-1 여정 탭에서 「쉬어갈만한 곳」 카드를 누르면 열립니다.', go: { target: 'journey', route: 'Main(tab=Journey)' } },
+        '팝업 여정 취소 확인': { variants: [v('여정 취소 확인', 'journey_cancel', 'Main(tab=Journey)', { popup: 'endJourney' })] },
+        'F-4 여정 없음 + 지난 여정': { variants: [
+          v('여정 없음', 'journey_empty', 'Main(tab=Journey)'), v('지난 여정 목록', 'journey_past', 'Main(tab=Journey)')] },
+        'F-5 지난 여정 상세': { hint: 'F-4 지난 여정 목록에서 한 줄을 누르면 열립니다.', go: { target: 'journey_past', route: 'Main(tab=Journey)' } },
+        'H-1 설정 홈': { variants: [v('설정', 'settings', 'Main(tab=Settings)')] },
+        'H-2 프로필 편집': { variants: [v('프로필 편집', 'profile_edit', 'ProfileEdit')] },
+        '설정 저작권 · 출처': { variants: [v('저작권 · 출처', 'credits', 'Credits')] },
+        '설정 연동 상태': { variants: [v('연동 상태', 'device', 'DeviceStatus')] },
+      }
+
+      // 플로우별 차량 상태: [보낼 대상 순서, 이름, 화면 코드]. 앞의 대상이 여정을 새로 만들고, 뒤의 gear_* · door가 차량 상태를 덮어쓴다.
+      // (debugJump은 기어 · 문 외의 대상마다 여정을 비우고 다시 만든다. 기어 덮어쓰기는 그대로 남는다.)
+      const SCENES = [
+        { title: '① 출발 전', tag: ['p', 'P 정차'], items: [
+          [['reset', 'gear_p'], '여정 없이 정차', 'B-1'],
+          [['briefing', 'gear_p'], '출발 브리핑', 'D-1'],
+          [['briefing_stop', 'gear_p'], '경유지 넣은 브리핑', 'D-3'],
+        ] },
+        { title: '② 이동 중', tag: ['d', 'D 주행 · 화면 잠김'], items: [
+          [['journey_stop', 'gear_d'], '경유지로 이동 중', 'E · F-2'],
+          [['journey', 'gear_d'], '목적지로 이동 중 (경유지 없음 · 들른 뒤)', 'E · F-1'],
+          [['drive', 'gear_d'], '주행 데모 여정 (음성 추천 포함)', 'E-1~E-5'],
+        ] },
+        { title: '③ 도착', tag: ['p', 'P 정차'], items: [
+          [['stop_arrive', 'gear_p'], '경유지 도착 · 하차 동선', 'G-1'],
+          [['unload', 'gear_p'], '목적지 도착 · 하차 브리핑', 'G-2'],
+          [['unload', 'gear_p', 'door'], '목적지 도착 + 운전석 문 열림', 'G-4'],
+          [['arrive', 'gear_p'], '에뮬레이터 위치 근처 목적지 (도착 판정)', 'B-4'],
+          [['journey', 'gear_p', 'geo_dest'], '위치를 목적지로 옮김 → 자동 도착 전환', 'G-8'],
+        ] },
+        { title: '⑤ 실제 흐름에서 (직접 목적지를 정해 안내 중일 때 누르기)', tag: ['p', '여정 그대로'], items: [
+          [['vc_drive'], '주행 시작 (기어 D + 속도 60km/h + ADAS 켬 · 화면 잠김)', 'E'],
+          [['vc_park', 'geo_dest', 'navi_arrived'], '목적지 도착 (자동 P + 위치 이동 + 내비 도착 신호 흉내)', 'G-8'],
+          [['vc_park', 'geo_stop', 'navi_stop_arrived'], '경유지 도착 (자동 P + 위치 이동 + 내비 경유지 도착 신호 흉내)', 'G-1'],
+        ] },
+        { title: '④ 기어만 · 예외', tag: ['x', '여정 그대로'], items: [
+          [['gear_p'], 'P 정차', ''],
+          [['gear_d'], 'D 주행', ''],
+          [['gear_auto'], '실제 기어 따르기 (덮어쓰기 풀기)', ''],
+          [['geo_dest'], '에뮬레이터 위치 → 앱의 목적지', ''],
+          [['geo_stop'], '에뮬레이터 위치 → 앱의 첫 경유지', ''],
+          [['geo_home'], '에뮬레이터 위치 → 원래(성남)', ''],
+          [['gear_unknown'], '기어 정보 없음', 'G-6'],
+          [['door'], '운전석 문 열림만', 'G-4'],
+          [['captions'], '데모 자막 켜기', ''],
+          [['captions_off'], '데모 자막 끄기', ''],
+          [['reset', 'gear_auto'], '초기화 (여정 없음 · 실제 기어)', '', 'warn'],
+        ] },
+      ]
+
+      const $ = (id) => document.getElementById(id)
+      let last = null // 마지막으로 고른 변형 { box, variant }
+
+      function toast(text) {
+        $('toast').textContent = text
+        $('toast').classList.add('show')
+        clearTimeout(toast.t)
+        toast.t = setTimeout(() => $('toast').classList.remove('show'), 4000)
+      }
+
+      async function send(body, el) {
+        el?.classList.add('sent')
+        try {
+          const res = await fetch('/api/jump', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+          const out = await res.json()
+          if (!res.ok || !out.ok) throw new Error(out.error || out.out)
+          return true
+        } catch (e) {
+          el?.classList.add('failed')
+          toast(`보내지 못했습니다: ${e.message}`)
+          return false
+        } finally {
+          setTimeout(() => el?.classList.remove('sent', 'failed'), 900)
+          setTimeout(poll, 700)
+        }
+      }
+
+      // ---------- 플로우차트 ----------
+      const style = document.createElement('style')
+      style.textContent = FLOW_CSS
+      document.head.append(style)
+      const flow = await (await fetch('./flow.json')).json()
+      const boxOf = new Map()
+      for (const [name, spec] of Object.entries(BOXES)) for (const x of spec.variants ?? []) boxOf.set(x, name)
+      const view = createFlowView($('flow'), flow, {
+        boxes: BOXES,
+        onPick: (variant) => {
+          last = { box: boxOf.get(variant) ?? null, variant }
+          send({ target: variant.target, query: variant.query })
+          toast(`${variant.label}`)
+        },
+        onHint: (spec) => {
+          if (spec.go) {
+            last = null
+            send({ target: spec.go.target })
+          }
+          toast(spec.hint)
+        },
+      })
+      const zoom = $('zoom')
+      for (const [m, label] of [['fit', '화면 맞춤'], ['0.5', '50%'], ['0.75', '75%'], ['1', '100%']]) {
+        const b = document.createElement('button')
+        b.className = 'btn' + (m === 'fit' ? ' on' : '')
+        b.textContent = label
+        b.addEventListener('click', () => {
+          zoom.querySelectorAll('.btn').forEach((x) => x.classList.toggle('on', x === b))
+          view.zoom(m)
+        })
+        zoom.append(b)
+      }
+
+      // ---------- 플로우별 차량 상태 ----------
+      const wait = (ms) => new Promise((r) => setTimeout(r, ms))
+      async function runSteps(steps, el) {
+        $('controls').querySelectorAll('.btn').forEach((x) => x.classList.toggle('on', x === el))
+        for (const [i, target] of steps.entries()) {
+          if (!(await send({ target }, el))) return
+          if (i < steps.length - 1) await wait(700) // onNewIntent가 앞 대상을 처리한 뒤 다음을 보낸다
+        }
+      }
+      const scenes = document.createElement('div')
+      scenes.className = 'scenes'
+      for (const scene of SCENES) {
+        const box = document.createElement('div')
+        box.className = 'scene'
+        box.innerHTML = `<h3>${scene.title}<span class="tag ${scene.tag[0]}">${scene.tag[1]}</span></h3>`
+        const list = document.createElement('div')
+        list.className = 'buttons'
+        for (const [steps, label, code, tone] of scene.items) {
+          const b = document.createElement('button')
+          b.className = 'btn' + (tone ? ' ' + tone : '')
+          b.innerHTML = `<span>${label}</span><small>${code ? code + ' · ' : ''}${steps.join(' → ')}</small>`
+          b.title = steps.join(' → ')
+          b.addEventListener('click', () => { last = null; runSteps(steps, b); toast(label) })
+          list.append(b)
+        }
+        box.append(list)
+        scenes.append(box)
+      }
+      $('controls').append(scenes)
+      $('search').addEventListener('submit', (e) => {
+        e.preventDefault()
+        const q = $('query').value.trim()
+        if (!q) return
+        last = { box: 'C-3 검색 결과 / 시설 타일 결과', variant: { route: 'Main(tab=Search)' } }
+        send({ target: 'search', query: q }, e.submitter)
+      })
+
+      // ---------- 지금 화면 ----------
+      const matches = (x, a) =>
+        x.locked ? !!a.locked
+          : !a.locked && x.route != null && (a.route || '').startsWith(x.route) && ('popup' in x ? (x.popup ?? null) === (a.popup ?? null) : !a.popup)
+
+      async function poll() {
+        try {
+          const s = await (await fetch('/api/status', { cache: 'no-store' })).json()
+          const a = s.app || {}
+          $('dot').className = 'dot' + (s.running && s.app ? ' on' : s.device ? ' half' : '')
+          $('line').textContent = !s.device
+            ? '에뮬레이터 연결 안 됨 (adb devices)'
+            : !s.running
+              ? '베프가 꺼져 있음 — 상자를 누르면 켜면서 이동합니다'
+              : !s.app
+                ? '베프 실행 중 · 화면 로그 대기 (화면 로그가 있는 디버그 빌드인지 확인)'
+                : [
+                    a.locked ? (a.guiding ? '길 안내 중 화면' : '주행 잠금 화면 (E)') : a.route,
+                    a.popup ? `팝업 ${a.popup}` : null,
+                    `기어 ${a.gear}`,
+                    a.profile ? `프로필 ${a.profile}` : '프로필 없음',
+                    a.dest ? `목적지 ${a.dest}${a.stops ? ` · 경유지 ${a.stops}` : ''}` : '여정 없음',
+                  ].filter(Boolean).join('  |  ')
+          $('raw').textContent = JSON.stringify(s, null, 2)
+          $('now').innerHTML = !s.app ? '지금: 앱 상태 없음'
+            : `지금: 기어 <b>${a.gear ?? '-'}</b> · ${a.locked ? '<b>주행 잠금</b> · ' : ''}${a.dest ? `목적지 <b>${a.dest}</b>${a.stops ? ` · 경유지 <b>${a.stops}</b>곳` : ' · 경유지 없음'}` : '여정 없음'}${a.popup ? ` · 팝업 ${a.popup}` : ''}`
+          let current = null
+          if (s.running && s.app) {
+            // 마지막으로 누른 상자가 지금 상태와 맞으면 그 상자, 아니면 상태가 맞는 첫 상자
+            if (last?.box && matches(last.variant, a)) current = last.box
+            else current = Object.entries(BOXES).find(([, spec]) => (spec.variants ?? []).some((x) => matches(x, a)))?.[0] ?? null
+          }
+          view.setCurrent(current)
+        } catch {
+          $('dot').className = 'dot'
+          $('line').textContent = '점검 서버 응답 없음 (node tools/beff-admin/server.mjs)'
+        }
+      }
+      poll()
+      setInterval(poll, 1000)
+    </script>
+  </body>
+</html>

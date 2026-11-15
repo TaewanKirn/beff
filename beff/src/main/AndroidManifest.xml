@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- NaviHelper: 경로 정보 조회 · 경로 탐색 설정 · 내비 화면 전환 (원문 Protection level: Normal) -->
+    <!-- 카카오맵 JavaScript API(WalkMapCard의 WebView)로 배경지도를 실행 중에 받아 온다. 이미지는 저장하지 않는다. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="pleos.car.permission.NAVI_ROUTE" />
+    <uses-permission android:name="pleos.car.permission.NAVI_ROUTE_SEARCH" />
+    <uses-permission android:name="pleos.car.permission.NAVI_CUSTOM_MAP" />
+    <!-- FusedLocation: 위치 조회 (보호 수준 dangerous) -->
+    <uses-permission android:name="pleos.car.permission.FUSED_LOCATION" />
+    <!-- TextToSpeech: 주행 중 음성 안내(말하기 전용) / SpeechToText: 검색창 음성 인식(온디바이스 모드) -->
+    <uses-permission android:name="pleos.car.permission.TTS_SERVICE" />
+    <uses-permission android:name="pleos.car.permission.STT_SERVICE" />
+    <!-- SDK가 엔진 오류로 못 쓰일 때 안드로이드 기본 음성 인식으로 넘어가는 경로의 마이크 -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- Vehicle: 기어 선택(읽기)만 쓴다 — 주차(P) 감지. 심사 가이드: Vehicle 퍼미션은 App Market 사전 협의 대상이므로 제출 전 승인 범위 확인 필요 [미확인] -->
+    <uses-permission android:name="pleos.car.permission.CAR_DRIVE" />
+    <!-- 1110 G-4: 문 열림(읽기만)으로 시설 안내 음성 -->
+    <uses-permission android:name="pleos.car.permission.CAR_DOORS" />
+
+    <!-- 차량 음성 엔진(Pleos TTS)에 접근하기 위한 패키지 가시성 -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+    </queries>
+
+    <application
+        android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:label="베프"
+        android:theme="@style/Theme.Beff">
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|uiMode">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- 정차 · 설정 화면은 주행 제한 상태에서도 열리도록 선언한다. 주행 중 화면 조작 요구 금지 원칙은 별도로 지킨다. -->
+            <meta-data
+                android:name="distractionOptimized"
+                android:value="true" />
+        </activity>
+    </application>
+</manifest>
